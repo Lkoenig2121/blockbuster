@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1200" viewBox="0 0 800 1200">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#082F49"/>
+      <stop offset="1" stop-color="#070b14"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="70%" cy="18%" r="75%">
+      <stop offset="0" stop-color="#F97316" stop-opacity="0.7"/>
+      <stop offset="1" stop-color="#F97316" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="1200" fill="url(#bg)"/>
+  <rect width="800" height="1200" fill="url(#sun)"/>
+  <g opacity="0.2" fill="#ffffff">
+    <rect x="90" y="185" width="440" height="14" rx="7"/>
+    <rect x="90" y="221" width="520" height="14" rx="7"/>
+    <rect x="90" y="257" width="360" height="14" rx="7"/>
+  </g>
+  <g opacity="0.3" stroke="#F97316" stroke-width="14" fill="none" stroke-linecap="round">
+    <path d="M110 790 C 250 650, 390 730, 520 560 C 650 390, 700 480, 735 320"/>
+  </g>
+  <g>
+    <rect x="70" y="900" width="660" height="220" rx="26" fill="rgba(0,0,0,0.35)"/>
+    <text x="110" y="980" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial" font-size="54" font-weight="900" fill="#F3F7FF">Couch Commander</text>
+    <text x="110" y="1035" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial" font-size="28" font-weight="700" fill="#F97316">2010 " Adventure</text>
+    <text x="110" y="1090" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial" font-size="24" font-weight="600" fill="rgba(243,247,255,0.8)">The greatest quests begin on the couch.</text>
+  </g>
+  <g>
+    <rect x="70" y="60" width="210" height="60" rx="30" fill="rgba(0,0,0,0.35)"/>
+    <text x="105" y="102" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial" font-size="28" font-weight="900" fill="#F3F7FF">PG</text>
+    <text x="160" y="102" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial" font-size="24" font-weight="800" fill="rgba(243,247,255,0.85)">BB</text>
+  </g>
+</svg>

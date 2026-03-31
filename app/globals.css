@@ -1,8 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Blockbuster-inspired brand colors */
+  --bb-blue: #0a3d91;
+  --bb-blue-2: #062a63;
+  --bb-yellow: #f5c400;
+
+  --background: #061634;
+  --foreground: #f3f7ff;
+  /* Make cards more opaque so text reads consistently */
+  --card: rgba(6, 42, 99, 0.45);
+  --card-border: rgba(255, 255, 255, 0.14);
+  --muted: #cfd8ff;
 }
 
 @theme inline {
@@ -14,13 +23,21 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #061634;
+    --foreground: #f3f7ff;
   }
 }
 
 body {
-  background: var(--background);
+  /* Keep the page background consistent (no dark top band). */
+  background:
+    radial-gradient(1200px 900px at 50% 40%, rgba(10, 61, 145, 0.25), transparent 70%),
+    linear-gradient(180deg, var(--background) 0%, var(--background) 100%);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
+    Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
 }

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1200" viewBox="0 0 800 1200">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#111827"/>
+      <stop offset="1" stop-color="#070b14"/>
+    </linearGradient>
+    <radialGradient id="neb" cx="65%" cy="22%" r="70%">
+      <stop offset="0" stop-color="#60A5FA" stop-opacity="0.65"/>
+      <stop offset="1" stop-color="#60A5FA" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="1200" fill="url(#bg)"/>
+  <rect width="800" height="1200" fill="url(#neb)"/>
+  <g opacity="0.35" fill="#ffffff">
+    <circle cx="120" cy="260" r="2"/><circle cx="210" cy="180" r="2"/><circle cx="310" cy="300" r="2"/>
+    <circle cx="520" cy="220" r="2"/><circle cx="640" cy="280" r="2"/><circle cx="700" cy="170" r="2"/>
+    <circle cx="450" cy="140" r="2"/><circle cx="580" cy="110" r="2"/><circle cx="160" cy="120" r="2"/>
+  </g>
+  <g opacity="0.28" stroke="#60A5FA" stroke-width="12" fill="none">
+    <path d="M90 760 C 210 650, 380 680, 470 560 C 560 430, 700 470, 730 360"/>
+  </g>
+  <g>
+    <rect x="70" y="900" width="660" height="220" rx="26" fill="rgba(0,0,0,0.35)"/>
+    <text x="110" y="980" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial" font-size="54" font-weight="900" fill="#F3F7FF">Galaxy VHS</text>
+    <text x="110" y="1035" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial" font-size="28" font-weight="700" fill="#60A5FA">2004 " SciFi</text>
+    <text x="110" y="1090" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial" font-size="24" font-weight="600" fill="rgba(243,247,255,0.8)">A message from deep space on magnetic tape.</text>
+  </g>
+  <g>
+    <rect x="70" y="60" width="240" height="60" rx="30" fill="rgba(0,0,0,0.35)"/>
+    <text x="105" y="102" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial" font-size="28" font-weight="900" fill="#F3F7FF">PG13</text>
+    <text x="210" y="102" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial" font-size="24" font-weight="800" fill="rgba(243,247,255,0.85)">BB</text>
+  </g>
+</svg>
