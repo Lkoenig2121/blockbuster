@@ -16,6 +16,7 @@ import {
   type RentalState,
 } from "../lib/rentals";
 import { BlockbusterLogo } from "./BlockbusterLogo";
+import { filterMoviesByFuzzyQuery, FUZZY_MIN_SCORE } from "../lib/fuzzySearch";
 
 type View = "browse" | "rentals";
 
@@ -176,12 +177,7 @@ export function BlockbusterApp() {
   const count = rentalCount(state);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return allMovies;
-    return allMovies.filter((m) => {
-      const hay = `${m.title} ${m.genre} ${m.year} ${m.rating}`.toLowerCase();
-      return hay.includes(q);
-    });
+    return filterMoviesByFuzzyQuery(allMovies, query, FUZZY_MIN_SCORE);
   }, [query, allMovies]);
 
   const rentals = useMemo(
