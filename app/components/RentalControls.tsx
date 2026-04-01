@@ -1,15 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Movie } from "../lib/movies";
 import {
   defaultRentalState,
   loadRentalState,
   rentMovie,
+  rentalStorageKey,
   returnMovie,
   saveRentalState,
   type RentalState,
 } from "../lib/rentals";
+import { loadSession } from "../lib/auth";
+import { useAuth } from "./AuthProvider";
 
 function formatDate(ms: number) {
   const d = new Date(ms);
@@ -77,28 +80,48 @@ function SubtleButton(props: React.ComponentProps<"button">) {
 }
 
 export function RentalControls({ movie }: { movie: Movie }) {
+  const { session, hydrated: authHydrated, openLogin } = useAuth();
+  const userId = session?.userId ?? null;
+
   const [state, setState] = useState<RentalState>(defaultRentalState());
   const [durationDays, setDurationDays] = useState<1 | 3 | 5>(3);
   const [rentalsHydrated, setRentalsHydrated] = useState(false);
+  const skipNextSaveRef = useRef(true);
 
   useEffect(() => {
-    setState(loadRentalState());
+    if (!authHydrated) return;
+    skipNextSaveRef.current = true;
+    setState(loadRentalState(userId));
     setRentalsHydrated(true);
-  }, []);
+  }, [authHydrated, userId]);
 
   useEffect(() => {
     if (!rentalsHydrated) return;
-    saveRentalState(state);
-  }, [state, rentalsHydrated]);
+    if (!userId) return;
+    if (skipNextSaveRef.current) {
+      skipNextSaveRef.current = false;
+      return;
+    }
+    saveRentalState(state, userId);
+  }, [state, rentalsHydrated, userId]);
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key !== "blockbuster:rentalState:v1") return;
-      setState(loadRentalState());
+      if (!userId || e.key !== rentalStorageKey(userId)) return;
+      setState(loadRentalState(userId));
+    };
+    const onSession = () => {
+      const uid = loadSession()?.userId ?? null;
+      skipNextSaveRef.current = true;
+      setState(loadRentalState(uid));
     };
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
+    window.addEventListener("blockbuster-session", onSession);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("blockbuster-session", onSession);
+    };
+  }, [userId]);
 
   const rental = state.rentalsByMovieId[movie.id];
 
@@ -146,9 +169,17 @@ export function RentalControls({ movie }: { movie: Movie }) {
         <div className="flex items-center gap-2">
           {!rental ? (
             <PrimaryButton
-              onClick={() => setState((s) => rentMovie(s, movie, durationDays))}
+              onClick={() => {
+                if (!userId) {
+                  openLogin();
+                  return;
+                }
+                setState((s) => rentMovie(s, movie, durationDays));
+              }}
             >
-              Rent ({durationDays} day{durationDays === 1 ? "" : "s"})
+              {userId
+                ? `Rent (${durationDays} day${durationDays === 1 ? "" : "s"})`
+                : "Log in to rent"}
             </PrimaryButton>
           ) : (
             <PrimaryButton
@@ -159,8 +190,7 @@ export function RentalControls({ movie }: { movie: Movie }) {
           )}
           <SubtleButton
             onClick={() => {
-              // quick “refresh” in case rentals changed elsewhere
-              setState(loadRentalState());
+              setState(loadRentalState(userId));
             }}
           >
             Sync

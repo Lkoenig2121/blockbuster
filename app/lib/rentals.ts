@@ -6,8 +6,12 @@ export type Rental = {
   dueAt: number; // epoch ms
 };
 
-const STORAGE_KEY = "blockbuster:rentalState:v1";
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Per-user rental bucket in localStorage. */
+export function rentalStorageKey(userId: string) {
+  return `blockbuster:rentalState:v1:${userId}`;
+}
 
 export type RentalState = {
   rentalsByMovieId: Record<string, Rental>;
@@ -17,10 +21,10 @@ export function defaultRentalState(): RentalState {
   return { rentalsByMovieId: {} };
 }
 
-export function loadRentalState(): RentalState {
-  if (typeof window === "undefined") return defaultRentalState();
+export function loadRentalState(userId: string | null): RentalState {
+  if (typeof window === "undefined" || !userId) return defaultRentalState();
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(rentalStorageKey(userId));
     if (!raw) return defaultRentalState();
     const parsed = JSON.parse(raw) as unknown;
     if (
@@ -40,9 +44,12 @@ export function loadRentalState(): RentalState {
   }
 }
 
-export function saveRentalState(state: RentalState) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+export function saveRentalState(state: RentalState, userId: string | null) {
+  if (typeof window === "undefined" || !userId) return;
+  window.localStorage.setItem(
+    rentalStorageKey(userId),
+    JSON.stringify(state),
+  );
 }
 
 export function isRented(state: RentalState, movieId: string) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { Movie } from "../lib/movies";
@@ -10,13 +10,16 @@ import {
   loadRentalState,
   rentalCount,
   rentMovie,
+  rentalStorageKey,
   returnMovie,
   saveRentalState,
   sortRentalsByDueDate,
   type RentalState,
 } from "../lib/rentals";
 import { BlockbusterLogo } from "./BlockbusterLogo";
+import { useAuth } from "./AuthProvider";
 import { filterMoviesByFuzzyQuery, FUZZY_MIN_SCORE } from "../lib/fuzzySearch";
+import { loadSession } from "../lib/auth";
 
 type View = "browse" | "rentals";
 
@@ -126,6 +129,9 @@ function SubtleButton(props: React.ComponentProps<"button">) {
 }
 
 export function BlockbusterApp() {
+  const { session, hydrated: authHydrated, openLogin, logout } = useAuth();
+  const userId = session?.userId ?? null;
+
   const [view, setView] = useState<View>("browse");
   const [query, setQuery] = useState("");
   const [state, setState] = useState<RentalState>(defaultRentalState());
@@ -133,11 +139,14 @@ export function BlockbusterApp() {
   const [moviesError, setMoviesError] = useState<string | null>(null);
   const [browseDurationDays, setBrowseDurationDays] = useState<1 | 3 | 5>(3);
   const [rentalsHydrated, setRentalsHydrated] = useState(false);
+  const skipNextSaveRef = useRef(true);
 
   useEffect(() => {
-    setState(loadRentalState());
+    if (!authHydrated) return;
+    skipNextSaveRef.current = true;
+    setState(loadRentalState(userId));
     setRentalsHydrated(true);
-  }, []);
+  }, [authHydrated, userId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -162,17 +171,31 @@ export function BlockbusterApp() {
 
   useEffect(() => {
     if (!rentalsHydrated) return;
-    saveRentalState(state);
-  }, [state, rentalsHydrated]);
+    if (!userId) return;
+    if (skipNextSaveRef.current) {
+      skipNextSaveRef.current = false;
+      return;
+    }
+    saveRentalState(state, userId);
+  }, [state, rentalsHydrated, userId]);
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key !== "blockbuster:rentalState:v1") return;
-      setState(loadRentalState());
+      if (!userId || e.key !== rentalStorageKey(userId)) return;
+      setState(loadRentalState(userId));
+    };
+    const onSession = () => {
+      const uid = loadSession()?.userId ?? null;
+      skipNextSaveRef.current = true;
+      setState(loadRentalState(uid));
     };
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
+    window.addEventListener("blockbuster-session", onSession);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("blockbuster-session", onSession);
+    };
+  }, [userId]);
 
   const count = rentalCount(state);
 
@@ -200,8 +223,9 @@ export function BlockbusterApp() {
             borderColor: "var(--card-border)",
           }}
         >
-          <div className="flex h-16 items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
+          {/* Navbar layout: compact below lg (1024px), full bar at lg+ */}
+          <div className="flex flex-col gap-2 py-2 lg:h-16 lg:flex-row lg:items-center lg:justify-between lg:py-0">
+            <div className="flex items-center justify-between gap-3 lg:justify-start">
               <button
                 type="button"
                 onClick={() => setView("browse")}
@@ -219,18 +243,27 @@ export function BlockbusterApp() {
               >
                 <BlockbusterLogo className="block h-9 w-[160px]" />
               </button>
-              <div className="hidden sm:block">
+              <div className="hidden lg:block">
                 <div className="text-sm font-semibold">
                   Rent now. Return later.
                 </div>
                 <div className="text-xs" style={{ color: "var(--muted)" }}>
-                  1-3-5‑day rentals • saved in this browser
+                  1–3–5‑day rentals • saved per account on this device
                 </div>
+              </div>
+
+              {/* Shown below lg only (same range as compact nav); must not use sm:hidden or 640–1023px loses auth */}
+              <div className="flex items-center gap-2 lg:hidden">
+                {session ? (
+                  <SubtleButton onClick={logout}>Sign out</SubtleButton>
+                ) : (
+                  <PrimaryButton onClick={openLogin}>Log in</PrimaryButton>
+                )}
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              <nav className="hidden sm:flex items-center gap-2">
+              <nav className="hidden items-center gap-2 lg:flex">
                 {view === "browse" ? (
                   <div className="mr-1 flex items-center gap-2">
                     <span className="text-xs font-semibold opacity-80">
@@ -292,15 +325,85 @@ export function BlockbusterApp() {
                     {count}
                   </span>
                 </SubtleButton>
+                {session ? (
+                  <>
+                    <span
+                      className="hidden max-w-[120px] truncate text-xs font-semibold lg:inline"
+                      style={{ color: "var(--muted)" }}
+                      title={session.email}
+                    >
+                      {session.name}
+                    </span>
+                    <SubtleButton onClick={logout}>Sign out</SubtleButton>
+                  </>
+                ) : (
+                  <PrimaryButton onClick={openLogin}>Log in</PrimaryButton>
+                )}
               </nav>
 
-              <div className="sm:hidden">
+              {/* Mobile nav row */}
+              <div className="flex flex-wrap items-center gap-2 lg:hidden">
+                {view === "browse" ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold opacity-80">
+                      Rental:
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <RentalPill
+                        active={browseDurationDays === 1}
+                        onClick={() => setBrowseDurationDays(1)}
+                      >
+                        1d
+                      </RentalPill>
+                      <RentalPill
+                        active={browseDurationDays === 3}
+                        onClick={() => setBrowseDurationDays(3)}
+                      >
+                        3d
+                      </RentalPill>
+                      <RentalPill
+                        active={browseDurationDays === 5}
+                        onClick={() => setBrowseDurationDays(5)}
+                      >
+                        5d
+                      </RentalPill>
+                    </div>
+                  </div>
+                ) : null}
+
                 <SubtleButton
-                  onClick={() =>
-                    setView((v) => (v === "browse" ? "rentals" : "browse"))
-                  }
+                  onClick={() => setView("browse")}
+                  aria-pressed={view === "browse"}
+                  style={{
+                    ...(view === "browse"
+                      ? { background: "rgba(255,255,255,0.08)" }
+                      : null),
+                    borderColor: "var(--card-border)",
+                  }}
                 >
-                  {view === "browse" ? `Rentals (${count})` : "Browse"}
+                  Browse
+                </SubtleButton>
+                <SubtleButton
+                  onClick={() => setView("rentals")}
+                  aria-pressed={view === "rentals"}
+                  style={{
+                    ...(view === "rentals"
+                      ? { background: "rgba(255,255,255,0.08)" }
+                      : null),
+                    borderColor: "var(--card-border)",
+                  }}
+                >
+                  My Rentals
+                  <span
+                    className="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold"
+                    style={{
+                      background: "rgba(245,196,0,0.18)",
+                      color: "var(--bb-yellow)",
+                      border: "1px solid rgba(245,196,0,0.35)",
+                    }}
+                  >
+                    {count}
+                  </span>
                 </SubtleButton>
               </div>
             </div>
@@ -392,13 +495,20 @@ export function BlockbusterApp() {
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
+                            if (!userId) {
+                              openLogin();
+                              return;
+                            }
                             setState((s) =>
                               rentMovie(s, movie, browseDurationDays),
                             );
                           }}
                         >
-                          Rent ({browseDurationDays} day
-                          {browseDurationDays === 1 ? "" : "s"})
+                          {userId
+                            ? `Rent (${browseDurationDays} day${
+                                browseDurationDays === 1 ? "" : "s"
+                              })`
+                            : "Log in to rent"}
                         </PrimaryButton>
                       ) : (
                         <SubtleButton
@@ -539,8 +649,8 @@ export function BlockbusterApp() {
               color: "var(--muted)",
             }}
           >
-            This is a fan-made demo UI. Rentals are stored locally in your
-            browser.
+            Fan-made demo UI. Sign in to rent; each account has its own rentals
+            saved in this browser.
           </div>
         </div>
       </footer>
