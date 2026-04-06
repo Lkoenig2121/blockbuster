@@ -73,12 +73,6 @@ function MoviePoster({ movie }: { movie: Movie }) {
         >
           {movie.rating ?? "NR"}
         </span>
-        <span
-          className="rounded-full px-2 py-1 text-[11px] font-semibold"
-          style={{ background: "rgba(0,0,0,0.35)" }}
-        >
-          {movie.genre}
-        </span>
       </div>
     </div>
   );
