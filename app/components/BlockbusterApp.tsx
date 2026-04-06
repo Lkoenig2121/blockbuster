@@ -221,13 +221,22 @@ export function BlockbusterApp() {
   }, [allMovies, genreMap]);
 
   const filteredMovies = useMemo(() => {
-    if (!selectedCategory || selectedCategory === "All") return allMovies;
-    return allMovies.filter((movie) =>
-      movie.genre
-        .split(", ")
-        .map((id) => genreMap[Number(id)] || "Unknown")
-        .includes(selectedCategory)
-    );
+    const filtered = !selectedCategory || selectedCategory === "All" 
+      ? allMovies 
+      : allMovies.filter((movie) =>
+          movie.genre
+            .split(", ")
+            .map((id) => genreMap[Number(id)] || "Unknown")
+            .includes(selectedCategory)
+        );
+    
+    // Remove duplicates by ID
+    const seen = new Set<string>();
+    return filtered.filter((movie) => {
+      if (seen.has(movie.id)) return false;
+      seen.add(movie.id);
+      return true;
+    });
   }, [allMovies, selectedCategory, genreMap]);
 
   const rentals = useMemo(() => {
