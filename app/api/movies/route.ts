@@ -1,76 +1,62 @@
 import { NextResponse } from "next/server";
 
-type GhibliFilm = {
-  id: string;
-  title: string;
-  description: string;
-  release_date: string;
-  running_time?: string;
-  image: string; // poster-ish
-  movie_banner: string; // wide banner
-  director: string;
-  rt_score: string;
-};
+const TMDB_API_KEY = process.env.TMDB_API_KEY;
 
-export type ApiMovie = {
-  id: string;
+interface TMDBMovie {
+  id: number;
   title: string;
-  year: number;
-  genre: string;
-  runtimeMinutes?: number;
-  rating?: string;
-  posterSrc: string;
-  bannerSrc?: string;
-  director?: string;
-  score?: number;
-  synopsis: string;
-};
+  release_date: string;
+  genre_ids: number[];
+  runtime?: number;
+  vote_average?: number;
+  poster_path: string;
+  overview: string;
+}
+
+interface TMDBResponse {
+  results: TMDBMovie[];
+}
 
 export async function GET() {
-  const res = await fetch("https://ghibliapi.vercel.app/films", {
-    // keep it snappy in dev; ok if occasionally stale
-    next: { revalidate: 60 * 60 },
-  });
+  const movies: Array<{
+    id: string;
+    title: string;
+    year: number;
+    genre: string;
+    runtimeMinutes: number | null;
+    rating: string;
+    posterSrc: string;
+    synopsis: string;
+  }> = [];
 
-  if (!res.ok) {
-    return NextResponse.json(
-      { error: "Failed to fetch movies" },
-      { status: 502 }
+  const totalPages = 50; // Fetch 50 pages (20 movies per page = 1000 movies)
+
+  for (let page = 1; page <= totalPages; page++) {
+    const res = await fetch(
+      `https://api.themoviedb.org/3/movie/popular?api_key=${TMDB_API_KEY}&language=en-US&page=${page}`
     );
+
+    if (!res.ok) {
+      return NextResponse.json(
+        { error: `Failed to fetch movies from TMDb on page ${page}` },
+        { status: 502 }
+      );
+    }
+
+    const data: TMDBResponse = await res.json();
+    const pageMovies = data.results.map((movie) => ({
+      id: movie.id.toString(),
+      title: movie.title,
+      year: new Date(movie.release_date).getFullYear(),
+      genre: movie.genre_ids.join(", "), // Replace with genre names if needed
+      runtimeMinutes: movie.runtime || null,
+      rating: movie.vote_average ? `Rated ${movie.vote_average}` : "Unrated",
+      posterSrc: `https://image.tmdb.org/t/p/w300${movie.poster_path}`,
+      synopsis: movie.overview,
+    }));
+
+    movies.push(...pageMovies);
   }
-
-  const films = (await res.json()) as GhibliFilm[];
-
-  const movies: ApiMovie[] = films
-    .filter((f) => f && f.id && f.title && f.image)
-    .map((f) => {
-      const year = Number.parseInt(f.release_date, 10);
-      const score = Number.parseInt(f.rt_score, 10);
-      const runtimeMinutes = Number.parseInt(f.running_time ?? "", 10);
-      const rating =
-        Number.isFinite(score) && score >= 90
-          ? "PG"
-          : Number.isFinite(score) && score >= 75
-            ? "PG-13"
-            : "G";
-
-      return {
-        id: f.id,
-        title: f.title,
-        year: Number.isFinite(year) ? year : 0,
-        genre: "Animation",
-        posterSrc: f.image,
-        bannerSrc: f.movie_banner,
-        director: f.director,
-        score: Number.isFinite(score) ? score : undefined,
-        runtimeMinutes: Number.isFinite(runtimeMinutes)
-          ? runtimeMinutes
-          : undefined,
-        synopsis: f.description,
-        rating,
-      };
-    })
-    .sort((a, b) => (b.year || 0) - (a.year || 0));
 
   return NextResponse.json({ movies });
 }

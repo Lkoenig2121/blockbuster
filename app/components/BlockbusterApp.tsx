@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { Movie } from "../lib/movies";
+import type { Rental } from "../lib/rentals";
 import {
   defaultRentalState,
   isRented,
@@ -11,14 +12,10 @@ import {
   rentalCount,
   rentMovie,
   rentalStorageKey,
-  returnMovie,
   saveRentalState,
-  sortRentalsByDueDate,
   type RentalState,
 } from "../lib/rentals";
-import { BlockbusterLogo } from "./BlockbusterLogo";
 import { useAuth } from "./AuthProvider";
-import { filterMoviesByFuzzyQuery, FUZZY_MIN_SCORE } from "../lib/fuzzySearch";
 import { loadSession } from "../lib/auth";
 
 type View = "browse" | "rentals";
@@ -51,12 +48,6 @@ function RentalPill({
       {children}
     </button>
   );
-}
-
-function formatRuntime(mins: number) {
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return h ? `${h}h ${m}m` : `${m}m`;
 }
 
 function MoviePoster({ movie }: { movie: Movie }) {
@@ -127,6 +118,8 @@ function SubtleButton(props: React.ComponentProps<"button">) {
     />
   );
 }
+
+import { BlockbusterLogo } from "./BlockbusterLogo";
 
 export function BlockbusterApp() {
   const { session, hydrated: authHydrated, openLogin, logout } = useAuth();
@@ -199,13 +192,66 @@ export function BlockbusterApp() {
 
   const count = rentalCount(state);
 
-  const filtered = useMemo(() => {
-    return filterMoviesByFuzzyQuery(allMovies, query, FUZZY_MIN_SCORE);
-  }, [query, allMovies]);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>("All");
 
-  const rentals = useMemo(
-    () => sortRentalsByDueDate(state, allMovies),
-    [state, allMovies],
+  const genreMap: Record<number, string> = useMemo(
+    () => ({
+      28: "Action",
+      12: "Adventure",
+      16: "Animation",
+      35: "Comedy",
+      80: "Crime",
+      99: "Documentary",
+      18: "Drama",
+      10751: "Family",
+      14: "Fantasy",
+      36: "History",
+      27: "Horror",
+      10402: "Music",
+      9648: "Mystery",
+      10749: "Romance",
+      878: "Science Fiction",
+      10770: "TV Movie",
+      53: "Thriller",
+      10752: "War",
+      37: "Western",
+    }),
+    []
+  );
+
+  const categories = useMemo(() => {
+    const uniqueGenreIds = new Set(
+      allMovies.flatMap((movie) => movie.genre.split(", ").map(Number))
+    );
+    return ["All", ...Array.from(uniqueGenreIds).map((id) => genreMap[id] || "Unknown")];
+  }, [allMovies, genreMap]);
+
+  const filteredMovies = useMemo(() => {
+    if (!selectedCategory || selectedCategory === "All") return allMovies;
+    return allMovies.filter((movie) =>
+      movie.genre
+        .split(", ")
+        .map((id) => genreMap[Number(id)] || "Unknown")
+        .includes(selectedCategory)
+    );
+  }, [allMovies, selectedCategory, genreMap]);
+
+  const rentals = useMemo(() => {
+    return Object.entries(state.rentalsByMovieId).map(([id, rental]) => {
+      const movie = allMovies.find((m) => m.id === id);
+      return movie ? { movie, rental } : null;
+    }).filter(Boolean) as { movie: Movie; rental: Rental }[];
+  }, [state, allMovies, genreMap]);
+
+  const [visibleMovies, setVisibleMovies] = useState(20);
+
+  const loadMoreMovies = () => {
+    setVisibleMovies((prev) => prev + 20);
+  };
+
+  const displayedMovies = useMemo(
+    () => filteredMovies.slice(0, visibleMovies),
+    [filteredMovies, visibleMovies, genreMap]
   );
 
   return (
@@ -241,7 +287,7 @@ export function BlockbusterApp() {
                 aria-label="Go to homepage"
                 title="Home"
               >
-                <BlockbusterLogo className="block h-9 w-[160px]" />
+                <BlockbusterLogo className="block h-9 w-40" />
               </button>
               <div className="hidden lg:block">
                 <div className="text-sm font-semibold">
@@ -328,7 +374,7 @@ export function BlockbusterApp() {
                 {session ? (
                   <>
                     <span
-                      className="hidden max-w-[120px] truncate text-xs font-semibold lg:inline"
+                      className="hidden max-w-30 truncate text-xs font-semibold lg:inline"
                       style={{ color: "var(--muted)" }}
                       title={session.email}
                     >
@@ -423,7 +469,7 @@ export function BlockbusterApp() {
                   Rent a title, then return it from “My Rentals”.
                 </p>
               </div>
-              <div className="w-full sm:w-[360px]">
+              <div className="w-full sm:w-90">
                 <label className="text-xs font-semibold" htmlFor="search">
                   Search
                 </label>
@@ -455,91 +501,54 @@ export function BlockbusterApp() {
               </div>
             ) : null}
 
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {filtered.map((movie) => {
-                const rented = isRented(state, movie.id);
-                return (
-                  <article
-                    key={movie.id}
-                    className="rounded-2xl border p-4"
-                    style={{
-                      borderColor: "var(--card-border)",
-                      background: "var(--card)",
-                    }}
-                  >
-                    <Link
-                      href={`/movies/${movie.id}`}
-                      className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                      style={{ textDecoration: "none", color: "inherit" }}
-                      aria-label={`Open ${movie.title}`}
-                    >
-                      <MoviePoster movie={movie} />
-                      <div className="mt-4">
-                        <div className="text-xs font-semibold opacity-80">
-                          {movie.year} • {movie.genre}
-                        </div>
-                        <div className="mt-1 text-lg font-bold tracking-tight">
-                          {movie.title}
-                        </div>
-                        <p
-                          className="mt-2 text-sm"
-                          style={{ color: "var(--muted)" }}
-                        >
-                          {movie.synopsis}
-                        </p>
-                      </div>
-                    </Link>
-                    <div className="mt-4 flex items-center justify-between gap-2">
-                      {!rented ? (
-                        <PrimaryButton
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (!userId) {
-                              openLogin();
-                              return;
-                            }
-                            setState((s) =>
-                              rentMovie(s, movie, browseDurationDays),
-                            );
-                          }}
-                        >
-                          {userId
-                            ? `Rent (${browseDurationDays} day${
-                                browseDurationDays === 1 ? "" : "s"
-                              })`
-                            : "Log in to rent"}
-                        </PrimaryButton>
-                      ) : (
-                        <SubtleButton
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setView("rentals");
-                          }}
-                          style={{
-                            borderColor: "rgba(245,196,0,0.45)",
-                            color: "var(--bb-yellow)",
-                            background: "rgba(245,196,0,0.08)",
-                          }}
-                        >
-                          Rented
-                        </SubtleButton>
-                      )}
-                      <div
-                        className="text-right text-xs"
-                        style={{ color: "var(--muted)" }}
-                      >
-                        {(movie.rating ?? "NR") +
-                          (movie.runtimeMinutes
-                            ? ` • ${formatRuntime(movie.runtimeMinutes)}`
-                            : "")}
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
+            {/* Categories Tabs */}
+            <div
+              className="categories-tabs flex gap-2 p-4 overflow-x-auto whitespace-nowrap"
+              style={{ scrollbarWidth: "thin", scrollbarColor: "#f5c400 #062a63", marginTop: "1rem" }}
+            >
+              {categories.map((category) => (
+                <button
+                  key={category}
+                  onClick={() => {
+                    setSelectedCategory(category);
+                    setVisibleMovies(20); // Reset visible movies when category changes
+                  }}
+                  className={`px-4 py-2 rounded-full text-sm font-semibold border transition-colors ${
+                    selectedCategory === category
+                      ? "bg-yellow-500 text-blue-900"
+                      : "bg-gray-200 text-gray-800"
+                  }`}
+                >
+                  {category}
+                </button>
+              ))}
             </div>
+
+            {/* Movies Grid */}
+            <div className="movies-grid grid grid-cols-2 gap-4 p-4">
+              {displayedMovies.map((movie) => (
+                <Link
+                  key={movie.id}
+                  href={`/movies/${movie.id}`}
+                  className="no-underline"
+                  style={{ textDecoration: "none", color: "inherit" }}
+                >
+                  <MoviePoster movie={movie} />
+                </Link>
+              ))}
+            </div>
+
+            {/* Load More Button */}
+            {visibleMovies < filteredMovies.length && (
+              <div className="flex justify-center p-4">
+                <button
+                  onClick={loadMoreMovies}
+                  className="px-6 py-2 rounded-full bg-yellow-500 text-blue-900 font-semibold hover:bg-yellow-600"
+                >
+                  Load More
+                </button>
+              </div>
+            )}
           </section>
         ) : (
           <section className="flex flex-col gap-6">
@@ -575,33 +584,28 @@ export function BlockbusterApp() {
                 {rentals.map(({ movie, rental }) => {
                   const overdue = Date.now() > rental.dueAt;
                   return (
-                    <div
+                    <Link
                       key={movie.id}
+                      href={`/movies/${movie.id}`}
                       className="flex gap-4 rounded-2xl border p-4"
                       style={{
                         borderColor: "var(--card-border)",
+                        textDecoration: "none",
                       }}
+                      aria-label={`Open ${movie.title}`}
                     >
-                      <Link
-                        href={`/movies/${movie.id}`}
-                        className="w-28 shrink-0"
-                        aria-label={`Open ${movie.title}`}
-                        style={{ color: "inherit" }}
-                      >
-                        <MoviePoster movie={movie} />
-                      </Link>
+                      <MoviePoster movie={movie} />
                       <div className="flex min-w-0 flex-1 flex-col justify-between gap-3">
                         <div className="min-w-0">
                           <div className="text-xs font-semibold opacity-80">
                             {movie.year} • {movie.genre}
                           </div>
-                          <Link
-                            href={`/movies/${movie.id}`}
+                          <div
                             className="mt-1 block truncate text-lg font-bold tracking-tight"
-                            style={{ color: "inherit", textDecoration: "none" }}
+                            style={{ color: "inherit" }}
                           >
                             {movie.title}
-                          </Link>
+                          </div>
                           <div
                             className="mt-2 text-sm"
                             style={{ color: "var(--muted)" }}
@@ -609,28 +613,17 @@ export function BlockbusterApp() {
                             Rented {formatDate(rental.rentedAt)} • Due{" "}
                             <span
                               style={{
-                                color: overdue ? "#FCA5A5" : "var(--bb-yellow)",
-                                fontWeight: 700,
+                                color: overdue
+                                  ? "#FCA5A5"
+                                  : "var(--bb-yellow)",
                               }}
                             >
                               {formatDate(rental.dueAt)}
                             </span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <PrimaryButton
-                            onClick={() =>
-                              setState((s) => returnMovie(s, movie.id))
-                            }
-                          >
-                            Return
-                          </PrimaryButton>
-                          <SubtleButton onClick={() => setView("browse")}>
-                            Rent more
-                          </SubtleButton>
-                        </div>
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>
