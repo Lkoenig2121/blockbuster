@@ -7,10 +7,8 @@ import type { Movie } from "../lib/movies";
 import type { Rental } from "../lib/rentals";
 import {
   defaultRentalState,
-  isRented,
   loadRentalState,
   rentalCount,
-  rentMovie,
   rentalStorageKey,
   saveRentalState,
   type RentalState,
@@ -51,6 +49,7 @@ function RentalPill({
 }
 
 function MoviePoster({ movie }: { movie: Movie }) {
+  const showLowStock = movie.quantity > 0 && movie.quantity < 12;
   return (
     <div
       className="relative aspect-2/3 w-full overflow-hidden rounded-xl border"
@@ -74,6 +73,20 @@ function MoviePoster({ movie }: { movie: Movie }) {
           {movie.rating ?? "NR"}
         </span>
       </div>
+      {showLowStock ? (
+        <div className="absolute inset-x-0 bottom-0 p-3">
+          <span
+            className="inline-flex rounded-full px-2 py-1 text-[11px] font-semibold"
+            style={{
+              background: "rgba(245,196,0,0.22)",
+              color: "var(--bb-yellow)",
+              border: "1px solid rgba(245,196,0,0.35)",
+            }}
+          >
+            Only {movie.quantity} left
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -121,6 +134,10 @@ export function BlockbusterApp() {
 
   const [view, setView] = useState<View>("browse");
   const [query, setQuery] = useState("");
+  const [searchTitle, setSearchTitle] = useState("");
+  const [searchGenre, setSearchGenre] = useState("");
+  const [searchYear, setSearchYear] = useState("");
+  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
   const [state, setState] = useState<RentalState>(defaultRentalState());
   const [allMovies, setAllMovies] = useState<Movie[]>([]);
   const [moviesError, setMoviesError] = useState<string | null>(null);
@@ -221,7 +238,7 @@ export function BlockbusterApp() {
   }, [allMovies, genreMap]);
 
   const filteredMovies = useMemo(() => {
-    const filtered = !selectedCategory || selectedCategory === "All" 
+    let filtered = !selectedCategory || selectedCategory === "All" 
       ? allMovies 
       : allMovies.filter((movie) =>
           movie.genre
@@ -230,6 +247,36 @@ export function BlockbusterApp() {
             .includes(selectedCategory)
         );
     
+    // Apply quick search (searches title, genre, and year)
+    if (query.trim()) {
+      const lowerQuery = query.toLowerCase();
+      filtered = filtered.filter((movie) => {
+        const matchesTitle = movie.title.toLowerCase().includes(lowerQuery);
+        const matchesGenre = movie.genre.toLowerCase().includes(lowerQuery);
+        const matchesYear = movie.year.toString().includes(lowerQuery);
+        return matchesTitle || matchesGenre || matchesYear;
+      });
+    }
+    
+    // Apply advanced search filters
+    if (searchTitle.trim()) {
+      filtered = filtered.filter((movie) =>
+        movie.title.toLowerCase().includes(searchTitle.toLowerCase())
+      );
+    }
+    
+    if (searchGenre.trim()) {
+      filtered = filtered.filter((movie) =>
+        movie.genre.toLowerCase().includes(searchGenre.toLowerCase())
+      );
+    }
+    
+    if (searchYear.trim()) {
+      filtered = filtered.filter((movie) =>
+        movie.year.toString() === searchYear.trim()
+      );
+    }
+    
     // Remove duplicates by ID
     const seen = new Set<string>();
     return filtered.filter((movie) => {
@@ -237,14 +284,14 @@ export function BlockbusterApp() {
       seen.add(movie.id);
       return true;
     });
-  }, [allMovies, selectedCategory, genreMap]);
+  }, [allMovies, selectedCategory, genreMap, query, searchTitle, searchGenre, searchYear]);
 
   const rentals = useMemo(() => {
     return Object.entries(state.rentalsByMovieId).map(([id, rental]) => {
       const movie = allMovies.find((m) => m.id === id);
       return movie ? { movie, rental } : null;
     }).filter(Boolean) as { movie: Movie; rental: Rental }[];
-  }, [state, allMovies, genreMap]);
+  }, [state, allMovies]);
 
   const [visibleMovies, setVisibleMovies] = useState(20);
 
@@ -254,7 +301,7 @@ export function BlockbusterApp() {
 
   const displayedMovies = useMemo(
     () => filteredMovies.slice(0, visibleMovies),
-    [filteredMovies, visibleMovies, genreMap]
+    [filteredMovies, visibleMovies]
   );
 
   return (
@@ -476,18 +523,105 @@ export function BlockbusterApp() {
                 <label className="text-xs font-semibold" htmlFor="search">
                   Search
                 </label>
-                <input
-                  id="search"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Title, genre, year..."
-                  className="mt-2 h-11 w-full rounded-full border px-4 text-sm outline-none"
-                  style={{
-                    borderColor: "var(--card-border)",
-                    background: "rgba(255,255,255,0.04)",
-                    color: "var(--foreground)",
-                  }}
-                />
+                <div className="mt-2 flex gap-2">
+                  <input
+                    id="search"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Quick search..."
+                    className="h-11 flex-1 rounded-full border px-4 text-sm outline-none"
+                    style={{
+                      borderColor: "var(--card-border)",
+                      background: "rgba(255,255,255,0.04)",
+                      color: "var(--foreground)",
+                    }}
+                  />
+                  <button
+                    onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
+                    className="h-11 rounded-full px-4 text-sm font-semibold border transition-colors"
+                    style={{
+                      borderColor: "var(--card-border)",
+                      background: showAdvancedSearch ? "rgba(245,196,0,0.12)" : "rgba(255,255,255,0.04)",
+                      color: showAdvancedSearch ? "var(--bb-yellow)" : "var(--foreground)",
+                    }}
+                  >
+                    ⚙️
+                  </button>
+                </div>
+
+                {/* Advanced Search */}
+                {showAdvancedSearch && (
+                  <div className="mt-3 space-y-2 p-4 rounded-2xl border" style={{ borderColor: "var(--card-border)", background: "rgba(255,255,255,0.02)" }}>
+                    <div>
+                      <label className="text-xs font-semibold" htmlFor="search-title">
+                        Title
+                      </label>
+                      <input
+                        id="search-title"
+                        value={searchTitle}
+                        onChange={(e) => setSearchTitle(e.target.value)}
+                        placeholder="Movie title..."
+                        className="mt-1 h-9 w-full rounded-lg border px-3 text-sm outline-none"
+                        style={{
+                          borderColor: "var(--card-border)",
+                          background: "rgba(255,255,255,0.04)",
+                          color: "var(--foreground)",
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold" htmlFor="search-genre">
+                        Genre
+                      </label>
+                      <input
+                        id="search-genre"
+                        value={searchGenre}
+                        onChange={(e) => setSearchGenre(e.target.value)}
+                        placeholder="e.g., Action, Drama..."
+                        className="mt-1 h-9 w-full rounded-lg border px-3 text-sm outline-none"
+                        style={{
+                          borderColor: "var(--card-border)",
+                          background: "rgba(255,255,255,0.04)",
+                          color: "var(--foreground)",
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold" htmlFor="search-year">
+                        Year
+                      </label>
+                      <input
+                        id="search-year"
+                        value={searchYear}
+                        onChange={(e) => setSearchYear(e.target.value)}
+                        placeholder="e.g., 2023..."
+                        type="number"
+                        className="mt-1 h-9 w-full rounded-lg border px-3 text-sm outline-none"
+                        style={{
+                          borderColor: "var(--card-border)",
+                          background: "rgba(255,255,255,0.04)",
+                          color: "var(--foreground)",
+                        }}
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        setQuery("");
+                        setSearchTitle("");
+                        setSearchGenre("");
+                        setSearchYear("");
+                      }}
+                      className="mt-2 h-8 w-full rounded-lg text-xs font-semibold border transition-colors"
+                      style={{
+                        borderColor: "var(--card-border)",
+                        background: "rgba(255,255,255,0.04)",
+                        color: "var(--foreground)",
+                      }}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 

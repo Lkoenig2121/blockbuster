@@ -7,6 +7,8 @@ export type Movie = {
   rating?: string;
   posterSrc: string;
   synopsis: string;
+  /** How many physical copies this store has on shelf (0 = sold out). */
+  quantity: number;
 };
 
 export const movies = [
@@ -18,7 +20,8 @@ export const movies = [
     runtimeMinutes: 90 + (i % 30),
     rating: ["G", "PG", "PG-13", "R"][i % 4],
     posterSrc: `/posters/movie-${i + 1}.jpg`,
-    synopsis: `This is the synopsis for Movie Title ${i + 1}. It is a ${["Action", "Comedy", "Drama", "Horror", "Sci-Fi", "Fantasy"][i % 6]} movie released in ${1980 + (i % 40)}.`
+    synopsis: `This is the synopsis for Movie Title ${i + 1}. It is a ${["Action", "Comedy", "Drama", "Horror", "Sci-Fi", "Fantasy"][i % 6]} movie released in ${1980 + (i % 40)}.`,
+    quantity: i % 17 === 0 ? 0 : 1 + (i % 6),
   }))
 ];
 

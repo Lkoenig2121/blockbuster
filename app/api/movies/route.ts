@@ -27,6 +27,7 @@ export async function GET() {
     rating: string;
     posterSrc: string;
     synopsis: string;
+    quantity: number;
   }> = [];
 
   const totalPages = 50; // Fetch 50 pages (20 movies per page = 1000 movies)
@@ -50,9 +51,15 @@ export async function GET() {
       year: new Date(movie.release_date).getFullYear(),
       genre: movie.genre_ids.join(", "), // Replace with genre names if needed
       runtimeMinutes: movie.runtime || null,
-      rating: movie.vote_average ? `Rated ${movie.vote_average}` : "Unrated",
+      rating: movie.vote_average ? `Rated ${movie.vote_average.toFixed(1)}` : "Unrated",
       posterSrc: `https://image.tmdb.org/t/p/w300${movie.poster_path}`,
       synopsis: movie.overview,
+      // Simulate a real store's physical inventory.
+      // Some titles are completely sold out; most have 1–7 copies.
+      quantity:
+        movie.id % 19 === 0
+          ? 0
+          : 1 + ((movie.id + movie.title.length + page) % 7),
     }));
 
     movies.push(...pageMovies);
